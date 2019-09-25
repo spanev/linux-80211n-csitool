@@ -17,7 +17,14 @@ Before proceeding further, you need to check the version of your kernel. It shou
 $ uname -r
 ```
 
-#### Compilers with retpoline support
+#### Required packages
+
+```shell
+$ sudo apt install build-essential linux-headers-$(uname -r) git-core
+```
+
+
+#### Compilers with retpoline support (Ubuntu 16.04)
 
 Newer kernels require compilers with retpoline supports.  GCC and G++ version 7.3 and above support that feature. The example below shows how to install GCC/G++ version 8:
 
@@ -29,10 +36,7 @@ $ sudo apt install gcc-8 g++-8
 
 You need to ensure that the <code>make</code> command uses the right version of the compilers. You can use either of these two ways do it
 
-##### Modify the Makefile (local solution)
-TODO
-
-##### Redirect the system-wide links to the compiler executables (system-wide solution)
+##### Redirect the system-wide links to the compiler executables
 Check where the current links point to. The command
 ```shell
 $ ls -l /usr/bin/gcc /usr/bin/g++
@@ -54,16 +58,6 @@ $ sudo ln -s /usr/bin/gcc-8 /usr/bin/gcc
 $ sudo ln -s /usr/bin/g++-8 /usr/bin/g++
 ```
 
-
-
-#### Additional packages which are required, but you may not have installed on your system
-
-```shell
-$ sudo apt install make linux-headers-$(uname -r) git-core
-```
-
-TODO: Put 2 tips
-
 ### Build and Install the Modified Wireless Driver
 
 Clone the modified Linux kernel code
@@ -77,7 +71,7 @@ Checkout the correct release version
 
 Build the modified driver for the existing kernel
 ```shell
-$ make -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/intel/iwlwifi modules
+$ make -j `nproc` -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/intel/iwlwifi modules
 ```
 
 ```shell
@@ -86,7 +80,7 @@ $ sudo make -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/inte
 $ sudo depmod
 $ cd ..
 ```
-TODO: Tip
+**Tip:** If the message <code>"Can't read private key"</code> appears, then the module could not be signed. This will not cause a problem unless the kernel enforces module signature verification.
 
 ### Install the Modified Firmware
 
@@ -106,12 +100,6 @@ $ sudo cp linux-80211n-csitool-supplementary/firmware/iwlwifi-5000-2.ucode.sigco
 $ sudo ln -s iwlwifi-5000-2.ucode.sigcomm2010 /lib/firmware/iwlwifi-5000-2.ucode
 ```
 
-### Build the Userspace Logging Tool
+### Enable logging and testing the driver
 
-ToDo
-
-
-### Enable Logging and Test
-
-ToDo
-
+In order to conduct tests with the newly installed driver, please refer to the [orinal CSI Tool website](https://dhalperi.github.io/linux-80211n-csitool/installation.html) installation instructions, Section 4 and 5.
