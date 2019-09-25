@@ -81,7 +81,7 @@ $ make -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/intel/iwl
 ```
 
 ```shell
-$ sudo make -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/iwlwifi INSTALL_MOD_DIR=updates \
+$ sudo make -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/intel/iwlwifi INSTALL_MOD_DIR=updates \
     modules_install
 $ sudo depmod
 $ cd ..
