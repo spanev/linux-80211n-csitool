@@ -11,7 +11,7 @@ The code presented here comprises of a modified version of the Linux kernel. The
 
 #### Kernel version
 
-Before proceeding further, you need to check the version of your kernel. It should be 4.15. The following command will print that information:
+Before proceeding further, you need to check the version of your kernel. It should be **4.15**, otherwise the commands below won't work. The following command will print that information:
 
 ```shell
 $ uname -r
@@ -29,16 +29,34 @@ $ sudo apt install gcc-8 g++-8
 
 You need to ensure that the <code>make</code> command uses the right version of the compilers. You can use either of these two ways do it
 
-##### Modify the Makefile
+##### Modify the Makefile (local solution)
 TODO
 
-##### Redirect the system links to the compilers executables
-TODO
+##### Redirect the system-wide links to the compiler executables (system-wide solution)
+Check where the current links point to. The command
+```shell
+$ ls -l /usr/bin/gcc /usr/bin/g++
+```
+should generate an output similar to
+
+```shell
+lrwxrwxrwx 1 root 5 Mar 27  2018 /usr/bin/g++ -> g++-5
+lrwxrwxrwx 1 root 5 Mar 27  2018 /usr/bin/gcc -> gcc-5
+```
+The current links are pointing to version 5. So they need to be redirected to version 8. To do that, remove the current links
+```shell
+$ sudo rm /usr/bin/gcc
+$ sudo rm /usr/bin/g++
+```
+and create the new ones
+```shell
+$ sudo ln -s /usr/bin/gcc-8 /usr/bin/gcc
+$ sudo ln -s /usr/bin/g++-8 /usr/bin/g++
+```
 
 
-If you multiple versions of the compilers  installed on your system, you need to modify the Makefile.
 
-Additional packages which are required, but you may not have
+####Additional packages which are required, but you may not have installed on your system
 
 ```shell
 $ sudo apt install make linux-headers-$(uname -r) git-core
@@ -48,13 +66,44 @@ TODO: Put 2 tips
 
 ### Build and Install the Modified Wireless Driver
 
-ToDo
+Clone the modified Linux kernel code
+```shell
+$ git clone https://github.com/spanev/linux-80211n-csitool.git
+$ cd linux-80211n-csitool
+```
 
+Checkout the correct release version
+(ToDo)
+
+Build the modified driver for the existing kernel
+```shell
+$ make -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/intel/iwlwifi modules
+```
+
+```shell
+$ sudo make -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/iwlwifi INSTALL_MOD_DIR=updates \
+    modules_install
+$ sudo depmod
+$ cd ..
+```
 
 ### Install the Modified Firmware
 
-ToDo
+Obtain the CSI Tool supplementary material:
+```shell
+$ git clone https://github.com/dhalperi/linux-80211n-csitool-supplementary.git
+```
 
+Relocate any existing firmware for Intel Wi-Fi Link 5000 Series adapters:
+```shell
+$ for file in /lib/firmware/iwlwifi-5000-*.ucode; do sudo mv $file $file.orig; done
+```
+
+Install the modified firmware:
+```shell
+$ sudo cp linux-80211n-csitool-supplementary/firmware/iwlwifi-5000-2.ucode.sigcomm2010 /lib/firmware/
+$ sudo ln -s iwlwifi-5000-2.ucode.sigcomm2010 /lib/firmware/iwlwifi-5000-2.ucode
+```
 
 ### Build the Userspace Logging Tool
 
