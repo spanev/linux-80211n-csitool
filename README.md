@@ -67,7 +67,9 @@ $ cd linux-80211n-csitool
 ```
 
 Checkout the correct release version
-(ToDo)
+	
+	$ CSITOOL_KERNEL_TAG=csitool-$(uname -r | cut -d . -f 1-2)
+	$ git checkout ${CSITOOL_KERNEL_TAG}
 
 Build the modified driver for the existing kernel
 ```shell
@@ -102,4 +104,4 @@ $ sudo ln -s iwlwifi-5000-2.ucode.sigcomm2010 /lib/firmware/iwlwifi-5000-2.ucode
 
 ### Enable logging and testing the driver
 
-In order to conduct tests with the newly installed driver, please refer to the [orinal CSI Tool website](https://dhalperi.github.io/linux-80211n-csitool/installation.html) installation instructions, Section 4 and 5.
+In order to conduct tests with the newly installed driver, please refer to the original [CSI Tool website's installation instructions](https://dhalperi.github.io/linux-80211n-csitool/installation.html), Section 4 and 5.
