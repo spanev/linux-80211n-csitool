@@ -1,7 +1,7 @@
 # Linux 802.11n CSI Tool for newer Linux kernels
 
 ## Intro
-The purpose of this repository is to provide support for building the CSI-enabled Wi-Fi drivers for **Intel Wireless Link 5300** adapters on Linux distributions with newer kernel versions. At this point this code has been tested on **Ubuntu 16.04** with kernel version **4.15**. More tests are expected soon.
+The purpose of this repository is to provide support for building the CSI-enabled Wi-Fi drivers for **Intel Wireless Link 5300** adapters on Linux distributions with newer kernel versions. At this point this code has been tested on **Ubuntu 16.04** and **Ubuntu 18.04** with kernel version **4.15**. More tests are expected soon.
 
 The code presented here comprises of a modified version of the Linux kernel. The modifications were made by examining the code provided by [dhalperi/linux-80211n-csitool](https://github.com/dhalperi/linux-80211n-csitool/) and adapting them to more recent Linux kernel versions - **iwlwifi** module. The building and installation instructions were taken from the original [Linux 802.11n CSI Tool](http://dhalperi.github.io/linux-80211n-csitool/) website and adapted accordingly.
 
