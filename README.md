@@ -86,6 +86,7 @@ $ sudo make -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/iwlw
 $ sudo depmod
 $ cd ..
 ```
+TODO: Tip
 
 ### Install the Modified Firmware
 
