@@ -39,6 +39,8 @@
 
 #include "dev.h"
 #include "agn.h"
+#include "connector.h"
+
 
 int iwlagn_hw_valid_rtc_data_addr(u32 addr)
 {

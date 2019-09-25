@@ -283,7 +283,7 @@ extern const u8 iwl_bcast_addr[ETH_ALEN];
 /* Sensitivity and chain noise calibration */
 #define INITIALIZATION_VALUE		0xFFFF
 #define IWL_CAL_NUM_BEACONS		16
-#define MAXIMUM_ALLOWED_PATHLOSS	15
+#define MAXIMUM_ALLOWED_PATHLOSS	50
 
 #define CHAIN_NOISE_MAX_DELTA_GAIN_CODE 3
 
@@ -809,6 +809,7 @@ struct iwl_priv {
 	u8 agg_tids_count;
 
 	struct iwl_rx_phy_res last_phy_res;
+	u8 last_cfg_phy_buf[IWLAGN_MAX_CFG_PHY_CNT*sizeof(u32)];
 	u32 ampdu_ref;
 	bool last_phy_res_valid;
 
@@ -874,6 +875,21 @@ struct iwl_priv {
 	bool disable_ht40;
 	void *wowlan_sram;
 #endif /* CONFIG_IWLWIFI_DEBUGFS */
+
+        u32 connector_log;
+        int last_rx_noise;
+        s8 last_rx_noiseA;
+        s8 last_rx_noiseB;
+        s8 last_rx_noiseC;
+        bool bf_enabled;
+        u32 monitor_tx_rate;
+        u32 bcast_tx_rate;
+
+        /* Setup for rotating rates */
+        u32 rotate_rates;
+        u32 last_rotate_rate;
+        u32 rotate_rate_total;
+        u32 *rotate_rate_array;
 
 	struct iwl_nvm_data *nvm_data;
 	/* eeprom blob for debugfs */

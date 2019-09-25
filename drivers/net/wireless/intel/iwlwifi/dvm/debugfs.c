@@ -2350,6 +2350,318 @@ DEBUGFS_READ_WRITE_FILE_OPS(log_event);
 #endif
 DEBUGFS_READ_WRITE_FILE_OPS(calib_disabled);
 
+static ssize_t iwl_dbgfs_bf_flag_read(struct file *file,
+                                         char __user *user_buf,
+                                         size_t count, loff_t *ppos)
+{
+       struct iwl_priv *priv = file->private_data;
+       char buf[11];
+       int len;
+
+       len = scnprintf(buf, sizeof(buf), "%d", priv->bf_enabled);
+
+       return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+static ssize_t iwl_dbgfs_bf_flag_write(struct file *file,
+                                          const char __user *user_buf,
+                                          size_t count, loff_t *ppos)
+{
+       struct iwl_priv *priv = file->private_data;
+       char buf[11];
+       unsigned long val;
+       int ret;
+
+       if (count > sizeof(buf))
+               return -EINVAL;
+
+       memset(buf, 0, sizeof(buf));
+       if (copy_from_user(buf, user_buf, count))
+               return -EFAULT;
+
+       ret = kstrtoul(buf, 0, &val);
+       if (ret)
+               return ret;
+
+       priv->bf_enabled = !!val;
+
+       return count;
+}
+DEBUGFS_READ_WRITE_FILE_OPS(bf_flag);
+
+static ssize_t iwl_dbgfs_rx_chains_msk_read(struct file *file,
+                                         char __user *user_buf,
+                                         size_t count, loff_t *ppos)
+{
+       struct iwl_priv *priv = file->private_data;
+       char buf[128];
+       int len;
+
+       len = scnprintf(buf, sizeof(buf), "rx_chains: %d antennas, mask 0x%x",
+                       priv->hw_params.rx_chains_num,
+                       priv->nvm_data->valid_rx_ant);
+
+       return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+static ssize_t iwl_dbgfs_rx_chains_msk_write(struct file *file,
+                                          const char __user *user_buf,
+                                          size_t count, loff_t *ppos)
+{
+       struct iwl_priv *priv = file->private_data;
+       struct iwl_rxon_context *ctx;
+       char buf[11];
+       unsigned long val;
+       int ret;
+
+       if (count > sizeof(buf))
+               return -EINVAL;
+
+       memset(buf, 0, sizeof(buf));
+       if (copy_from_user(buf, user_buf, count))
+               return -EFAULT;
+
+       ret = kstrtoul(buf, 0, &val);
+       if (ret)
+               return ret;
+
+       if ((val & ANT_ABC) != val) {
+               IWL_ERR(priv, "Invalid rx ant mask 0x%lx\n", val);
+               return -EINVAL;
+       }
+       IWL_INFO(priv, "Committing rx_chains_msk = 0x%lx\n", val);
+
+       mutex_lock(&priv->mutex);
+       /* Update chains and number of chains */
+       priv->nvm_data->valid_rx_ant = val;
+       priv->hw_params.rx_chains_num = num_of_ant(val);
+       /* This is useful for verifying valid rates */
+       priv->chain_noise_data.active_chains = val;
+
+       for_each_context(priv, ctx) {
+               iwlagn_set_rxon_chain(priv, ctx);
+               iwlagn_commit_rxon(priv, ctx);
+       }
+       mutex_unlock(&priv->mutex);
+
+       return count;
+}
+DEBUGFS_READ_WRITE_FILE_OPS(rx_chains_msk);
+
+static ssize_t iwl_dbgfs_rotate_rates_read(struct file *file,
+                                         char __user *user_buf,
+                                         size_t count, loff_t *ppos)
+{
+       struct iwl_priv *priv = file->private_data;
+       char buf[11];
+       int len;
+
+       len = scnprintf(buf, sizeof(buf), "0x%x", priv->rotate_rates);
+
+       return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+static ssize_t iwl_dbgfs_rotate_rates_write(struct file *file,
+                                          const char __user *user_buf,
+                                          size_t count, loff_t *ppos)
+{
+       struct iwl_priv *priv = file->private_data;
+       char buf[11];
+       unsigned long val;
+       int ret;
+       u32 num_rates;
+       u32 cur_rate;
+       u32 tmp, i, start_rate;
+
+       if (count > sizeof(buf))
+               return -EINVAL;
+
+       memset(buf, 0, sizeof(buf));
+       if (copy_from_user(buf, user_buf, count))
+               return -EFAULT;
+
+       ret = kstrtoul(buf, 0, &val);
+       if (ret)
+               return ret;
+
+       /* Dan: new rotate_rates scheme using flags */
+       if (priv->rotate_rates) {
+               kfree(priv->rotate_rate_array);
+               priv->rotate_rate_array = NULL;
+               priv->last_rotate_rate = 0;
+               priv->rotate_rate_total = 0;
+               priv->rotate_rates = 0;
+       }
+
+       if (val == 0)
+               return count;
+
+       /* Parse val to determine number of configs */
+       num_rates = 0;
+       if (val & ROTATE_SISO) /* SISO */
+               num_rates++;
+       if (val & ROTATE_MIMO2) /* MIMO2 */
+               num_rates++;
+       if (val & ROTATE_MIMO3) /* MIMO3 */
+               num_rates++;
+       if (val & ROTATE_TX_SEL) /* TX SEL */ {
+               if (val & ROTATE_SISO) num_rates += 2;
+               if (val & ROTATE_MIMO2) num_rates += 2;
+       }
+       if (val & ROTATE_HT40) /* HT40 */
+               num_rates *= 2;
+       if (val & ROTATE_SGI) /* SGI */
+               num_rates *= 2;
+       if (val & ROTATE_SKIP) /* SKIP short rates */ {
+               num_rates *= 6;
+               start_rate = 2;
+       } else {
+               num_rates *= 8;
+               start_rate = 0;
+       }
+
+       /* Shouldn't be true but may as well make sure */
+       if (num_rates == 0)
+               return -EINVAL;
+
+       /* Now set up rotate_rate_array */
+       priv->rotate_rate_array = kmalloc(num_rates * sizeof(u32),
+                       GFP_KERNEL);
+       if (!priv->rotate_rate_array)
+               return -ENOMEM;
+       priv->rotate_rates = 1;
+       priv->last_rotate_rate = 0;
+       priv->rotate_rate_total = num_rates;
+
+       cur_rate = 0;
+       if (val & ROTATE_SISO) /* SISO rates */
+               for (i = start_rate; i < 8; ++i, ++cur_rate)
+                       priv->rotate_rate_array[cur_rate] = 0x4100 + i;
+       if (val & ROTATE_MIMO2) /* MIMO2 rates */
+               for (i = start_rate; i < 8; ++i, ++cur_rate)
+                       priv->rotate_rate_array[cur_rate] = 0xc108 + i;
+       if (val & ROTATE_MIMO3) /* MIMO3 rates */
+               for (i = start_rate; i < 8; ++i, ++cur_rate)
+                       priv->rotate_rate_array[cur_rate] = 0x1c110 + i;
+       if ((val & ROTATE_TX_SEL) && (val & ROTATE_SISO)) {
+               /* TX SEL SISO rates */
+               for (i = start_rate; i < 8; ++i, ++cur_rate)
+                       priv->rotate_rate_array[cur_rate] = 0x8100 + i;
+               for (i = start_rate; i < 8; ++i, ++cur_rate)
+                       priv->rotate_rate_array[cur_rate] = 0x10100 + i;
+       }
+       if ((val & ROTATE_TX_SEL) && (val & ROTATE_MIMO2)) {
+               /* TX SEL MIMO2 rates */
+               for (i = start_rate; i < 8; ++i, ++cur_rate)
+                       priv->rotate_rate_array[cur_rate] = 0x14108 + i;
+               for (i = start_rate; i < 8; ++i, ++cur_rate)
+                       priv->rotate_rate_array[cur_rate] = 0x18108 + i;
+       }
+       if (val & ROTATE_HT40) { /* HT40 rates */
+               tmp = cur_rate;
+               for (i = start_rate; i < tmp; ++i, ++cur_rate)
+                       priv->rotate_rate_array[cur_rate] =
+                               priv->rotate_rate_array[i] | RATE_MCS_HT40_MSK;
+       }
+       if (val & ROTATE_SGI) { /* SGI rates */
+               tmp = cur_rate;
+               for (i = start_rate; i < tmp; ++i, ++cur_rate)
+                       priv->rotate_rate_array[cur_rate] =
+                               priv->rotate_rate_array[i] | RATE_MCS_SGI_MSK;
+       }
+
+       IWL_INFO(priv, "Set up %u rotate_rates:%s%s%s%s%s%s%s.\n",
+                       priv->rotate_rate_total,
+                       (val & ROTATE_SISO) ? " SISO" : "",
+                       (val & ROTATE_MIMO2) ? " MIMO2" : "",
+                       (val & ROTATE_MIMO3) ? " MIMO3" : "",
+                       (val & ROTATE_TX_SEL) ? " TX_SEL" : "",
+                       (val & ROTATE_HT40) ? " HT40" : "",
+                       (val & ROTATE_SGI) ? " SGI" : "",
+                       (val & ROTATE_SKIP) ? " SKIP" : "");
+
+       return count;
+}
+DEBUGFS_READ_WRITE_FILE_OPS(rotate_rates);
+
+static ssize_t iwl_dbgfs_monitor_tx_rate_read(struct file *file,
+                                         char __user *user_buf,
+                                         size_t count, loff_t *ppos)
+{
+       struct iwl_priv *priv = file->private_data;
+       char buf[11];
+       int len;
+
+       len = scnprintf(buf, sizeof(buf), "0x%x", priv->monitor_tx_rate);
+
+       return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+static ssize_t iwl_dbgfs_monitor_tx_rate_write(struct file *file,
+                                          const char __user *user_buf,
+                                          size_t count, loff_t *ppos)
+{
+       struct iwl_priv *priv = file->private_data;
+       char buf[11];
+       unsigned long val;
+       int ret;
+
+       if (count > sizeof(buf))
+               return -EINVAL;
+
+       memset(buf, 0, sizeof(buf));
+       if (copy_from_user(buf, user_buf, count))
+               return -EFAULT;
+
+       ret = kstrtoul(buf, 0, &val);
+       if (ret)
+               return ret;
+
+       priv->monitor_tx_rate = val;
+
+       return count;
+}
+DEBUGFS_READ_WRITE_FILE_OPS(monitor_tx_rate);
+
+static ssize_t iwl_dbgfs_bcast_tx_rate_read(struct file *file,
+                                         char __user *user_buf,
+                                         size_t count, loff_t *ppos)
+{
+       struct iwl_priv *priv = file->private_data;
+       char buf[11];
+       int len;
+
+       len = scnprintf(buf, sizeof(buf), "0x%x", priv->bcast_tx_rate);
+
+       return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+static ssize_t iwl_dbgfs_bcast_tx_rate_write(struct file *file,
+                                          const char __user *user_buf,
+                                          size_t count, loff_t *ppos)
+{
+       struct iwl_priv *priv = file->private_data;
+       char buf[11];
+       unsigned long val;
+       int ret;
+
+       if (count > sizeof(buf))
+               return -EINVAL;
+
+       memset(buf, 0, sizeof(buf));
+       if (copy_from_user(buf, user_buf, count))
+               return -EFAULT;
+
+       ret = kstrtoul(buf, 0, &val);
+       if (ret)
+               return ret;
+
+       priv->bcast_tx_rate = val;
+
+       return count;
+}
+DEBUGFS_READ_WRITE_FILE_OPS(bcast_tx_rate);
+
 /*
  * Create the debugfs files and directories
  *
@@ -2409,6 +2721,11 @@ int iwl_dbgfs_register(struct iwl_priv *priv, struct dentry *dbgfs_dir)
 
 	if (iwl_advanced_bt_coexist(priv))
 		DEBUGFS_ADD_FILE(bt_traffic, dir_debug, S_IRUSR);
+	DEBUGFS_ADD_FILE(bf_flag, dir_debug, S_IRUSR | S_IWUSR);
+	DEBUGFS_ADD_FILE(rx_chains_msk, dir_debug, S_IRUSR | S_IWUSR);
+	DEBUGFS_ADD_FILE(rotate_rates, dir_debug, S_IRUSR | S_IWUSR);
+	DEBUGFS_ADD_FILE(monitor_tx_rate, dir_debug, S_IRUSR | S_IWUSR);
+	DEBUGFS_ADD_FILE(bcast_tx_rate, dir_debug, S_IRUSR | S_IWUSR);
 
 	/* Calibrations disabled/enabled status*/
 	DEBUGFS_ADD_FILE(calib_disabled, dir_rf, S_IWUSR | S_IRUSR);

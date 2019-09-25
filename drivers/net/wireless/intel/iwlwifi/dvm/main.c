@@ -57,6 +57,7 @@
 #include "dev.h"
 #include "calib.h"
 #include "agn.h"
+#include "connector.h"
 
 
 /******************************************************************************
@@ -135,6 +136,7 @@ static const struct iwl_hcmd_names iwl_dvm_cmd_names[] = {
 	HCMD_NAME(REPLY_WIPAN_QOS_PARAM),
 	HCMD_NAME(REPLY_WIPAN_WEPKEY),
 	HCMD_NAME(REPLY_WIPAN_P2P_CHANNEL_SWITCH),
+	HCMD_NAME(REPLY_BFEE_NOTIFICATION),
 	HCMD_NAME(REPLY_WIPAN_NOA_NOTIFICATION),
 	HCMD_NAME(REPLY_WIPAN_DEACTIVATION_COMPLETE),
 	HCMD_NAME(REPLY_RX_PHY_CMD),
@@ -640,7 +642,7 @@ static void iwl_init_context(struct iwl_priv *priv, u32 ucode_flags)
 	priv->contexts[IWL_RXON_CTX_BSS].exclusive_interface_modes =
 		BIT(NL80211_IFTYPE_ADHOC) | BIT(NL80211_IFTYPE_MONITOR);
 	priv->contexts[IWL_RXON_CTX_BSS].interface_modes =
-		BIT(NL80211_IFTYPE_STATION);
+		BIT(NL80211_IFTYPE_STATION) | BIT(NL80211_IFTYPE_AP);
 	priv->contexts[IWL_RXON_CTX_BSS].ap_devtype = RXON_DEV_TYPE_AP;
 	priv->contexts[IWL_RXON_CTX_BSS].ibss_devtype = RXON_DEV_TYPE_IBSS;
 	priv->contexts[IWL_RXON_CTX_BSS].station_devtype = RXON_DEV_TYPE_ESS;
@@ -873,6 +875,8 @@ int iwl_alive_start(struct iwl_priv *priv)
 
 	/* At this point, the NIC is initialized and operational */
 	iwl_rf_kill_ct_config(priv);
+
+	iwl_connector_set_priv(priv);
 
 	IWL_DEBUG_INFO(priv, "ALIVE processing complete.\n");
 
@@ -1123,6 +1127,16 @@ static int iwl_init_drv(struct iwl_priv *priv)
 	priv->current_ht_config.smps = IEEE80211_SMPS_STATIC;
 	priv->missed_beacon_threshold = IWL_MISSED_BEACON_THRESHOLD_DEF;
 	priv->agg_tids_count = 0;
+	
+        /* Dan's parameters */
+        priv->connector_log = iwlwifi_mod_params.connector_log;
+        priv->bf_enabled = 1;           /* Enabled */
+        priv->rotate_rates = 0;         /* Disabled */
+        priv->last_rotate_rate = 0;     /* Disabled */
+        priv->rotate_rate_total = 0;    /* Disabled */
+        priv->rotate_rate_array = NULL; /* Disabled */
+        priv->monitor_tx_rate = 0;      /* Disabled */
+        priv->bcast_tx_rate = 0;        /* Disabled */
 
 	priv->rx_statistics_jiffies = jiffies;
 
@@ -1244,6 +1258,7 @@ static struct iwl_op_mode *iwl_op_mode_dvm_start(struct iwl_trans *trans,
 		REPLY_COMPRESSED_BA,
 		STATISTICS_NOTIFICATION,
 		REPLY_TX,
+		REPLY_BFEE_NOTIFICATION,
 	};
 	int i;
 
@@ -2166,11 +2181,25 @@ static int __init iwl_init(void)
 		return ret;
 	}
 
+        ret = iwlagn_register_connector();
+        if (ret) {
+                pr_err("Unable to initialize connector: %d\n", ret);
+                goto error_connector_register;
+        }
+
+
 	ret = iwl_opmode_register("iwldvm", &iwl_dvm_ops);
 	if (ret) {
 		pr_err("Unable to register op_mode: %d\n", ret);
-		iwlagn_rate_control_unregister();
+		goto error_opmode_register;
 	}
+
+	return ret;
+
+error_opmode_register:
+	iwlagn_unregister_connector();
+error_connector_register:
+	iwlagn_rate_control_unregister();
 
 	return ret;
 }
@@ -2179,6 +2208,7 @@ module_init(iwl_init);
 static void __exit iwl_exit(void)
 {
 	iwl_opmode_deregister("iwldvm");
+	iwlagn_unregister_connector();
 	iwlagn_rate_control_unregister();
 }
 module_exit(iwl_exit);

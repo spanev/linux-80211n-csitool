@@ -218,6 +218,8 @@ int iwlagn_tx_agg_flush(struct iwl_priv *priv, struct ieee80211_vif *vif,
 void iwlagn_rx_reply_compressed_ba(struct iwl_priv *priv,
 				   struct iwl_rx_cmd_buffer *rxb);
 void iwlagn_rx_reply_tx(struct iwl_priv *priv, struct iwl_rx_cmd_buffer *rxb);
+//void iwlagn_bfee_notif(struct iwl_priv *priv, struct iwl_rx_cmd_buffer *rxb,
+//		      struct iwl_device_cmd *cmd);
 
 static inline u32 iwl_tx_status_to_mac80211(u32 status)
 {
@@ -472,5 +474,13 @@ do {									\
 		__iwl_err((m)->dev, true, true, fmt, ##args);	\
 } while (0)
 #endif				/* CONFIG_IWLWIFI_DEBUG */
+
+extern const u8 iwl_monitor_addr[ETH_ALEN];
+static inline bool is_monitor_ether_addr(const u8 *addr)
+{
+	if (WARN_ON(addr == NULL))
+		return 0;
+	return !memcmp(addr, iwl_monitor_addr, ETH_ALEN);
+}
 
 #endif /* __iwl_agn_h__ */

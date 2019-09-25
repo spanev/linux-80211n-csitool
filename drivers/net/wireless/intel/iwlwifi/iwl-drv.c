@@ -1305,6 +1305,12 @@ static void iwl_req_fw_callback(const struct firmware *ucode_raw, void *context)
 		api_ver = IWL_UCODE_API(drv->fw.ucode_ver);
 
 	/*
+         * Dan -- disable firmware version checks. Instead, verify
+         * that the firmware has the size expected for the hacked firmware
+         */
+        (void)api_min; /* Dan -- remove warning */
+#if 0
+        /*
 	 * api_ver should match the api version forming part of the
 	 * firmware filename ... but we don't check for that and only rely
 	 * on the API version read from firmware header from here on forward
@@ -1316,6 +1322,12 @@ static void iwl_req_fw_callback(const struct firmware *ucode_raw, void *context)
 			api_max, api_ver);
 		goto try_again;
 	}
+#endif
+
+        if (ucode_raw->size != 336252) {
+                IWL_ERR(drv,
+                        "Firmware size does not match iwlwifi-5000-2.ucode.sigcomm2010. The UW 802.11n CSI Tool will not work.\n");
+        }
 
 	/*
 	 * In mvm uCode there is no difference between data and instructions
@@ -1606,6 +1618,9 @@ struct iwl_mod_params iwlwifi_mod_params = {
 	.fw_restart = true,
 	.bt_coex_active = true,
 	.power_level = IWL_POWER_INDEX_1,
+#ifdef CONFIG_IWLWIFI_DEBUG
+	.debug_level = IWL_DL_FW_ERRORS,
+#endif
 	.d0i3_disable = true,
 	.d0i3_timeout = 1000,
 	.uapsd_disable = IWL_DISABLE_UAPSD_BSS | IWL_DISABLE_UAPSD_P2P_CLIENT,
@@ -1699,6 +1714,10 @@ module_param_named(debug, iwlwifi_mod_params.debug_level, uint,
 MODULE_PARM_DESC(debug, "debug output mask");
 #endif
 
+module_param_named(connector_log, iwlwifi_mod_params.connector_log, int,
+                S_IRUGO);
+MODULE_PARM_DESC(connector_log,
+                "set connector log mask (default 0 [nothing])");
 module_param_named(swcrypto, iwlwifi_mod_params.swcrypto, int, S_IRUGO);
 MODULE_PARM_DESC(swcrypto, "using crypto in software (default 0 [hardware])");
 module_param_named(11n_disable, iwlwifi_mod_params.disable_11n, uint, S_IRUGO);

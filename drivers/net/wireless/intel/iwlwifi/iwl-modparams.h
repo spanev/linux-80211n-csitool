@@ -106,12 +106,13 @@ enum iwl_uapsd_disable {
  * @disable_11n: disable 11n capabilities, default = 0,
  *	use IWL_[DIS,EN]ABLE_HT_* constants
  * @amsdu_size: See &enum iwl_amsdu_size.
+ * @connector_log: which connector messages, default = 0
  * @fw_restart: restart firmware, default = 1
  * @bt_coex_active: enable bt coex, default = true
  * @led_mode: system default, default = 0
  * @power_save: enable power save, default = false
  * @power_level: power level, default = 1
- * @debug_level: levels are IWL_DL_*
+ * @debug_level: levels are IWL_DL_*, default = IWL_DL_FW_ERRORS
  * @antenna_coupling: antenna coupling in dB, default = 0
  * @nvm_file: specifies a external NVM file
  * @uapsd_disable: disable U-APSD, see &enum iwl_uapsd_disable, default =
@@ -128,6 +129,7 @@ struct iwl_mod_params {
 	unsigned int disable_11n;
 	int amsdu_size;
 	bool fw_restart;
+	int connector_log;
 	bool bt_coex_active;
 	int led_mode;
 	bool power_save;

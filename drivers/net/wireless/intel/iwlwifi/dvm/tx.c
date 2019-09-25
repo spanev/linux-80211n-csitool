@@ -156,9 +156,23 @@ static void iwlagn_tx_cmd_build_rate(struct iwl_priv *priv,
 	tx_cmd->data_retry_limit = data_retry_limit;
 	tx_cmd->rts_retry_limit = rts_retry_limit;
 
-	/* DATA packets will use the uCode station table for rate/antenna
-	 * selection */
-	if (ieee80211_is_data(fc)) {
+        /*
+         * DATA packets will use the uCode station table for rate/antenna
+         * selection.
+         * ...
+         * But handle some special experimental cases first
+         */
+        if (ieee80211_is_data(fc) && priv->rotate_rates) {
+                tx_cmd->tx_flags &= ~TX_CMD_FLG_STA_RATE_MSK;
+                tx_cmd->rate_n_flags = cpu_to_le32(
+                        priv->rotate_rate_array[priv->last_rotate_rate]);
+                priv->last_rotate_rate = (priv->last_rotate_rate + 1) %
+                        priv->rotate_rate_total;
+                /* No retries in this mode */
+                tx_cmd->data_retry_limit = 0;
+                tx_cmd->rts_retry_limit = 0;
+                return;
+        } else if (ieee80211_is_data(fc)) {
 		tx_cmd->initial_rate_index = 0;
 		tx_cmd->tx_flags |= TX_CMD_FLG_STA_RATE_MSK;
 		return;
@@ -338,6 +352,8 @@ int iwlagn_tx_skb(struct iwl_priv *priv,
 			goto drop_unlock_priv;
 		}
 	}
+	if (sta == NULL && is_monitor_ether_addr(hdr->addr1))
+		sta_id = IWLAGN_MONITOR_ID;
 
 	if (sta)
 		sta_priv = (void *)sta->drv_priv;
@@ -379,7 +395,19 @@ int iwlagn_tx_skb(struct iwl_priv *priv,
 	/* TODO need this for burst mode later on */
 	iwlagn_tx_cmd_build_basic(priv, skb, tx_cmd, info, hdr, sta_id);
 
-	iwlagn_tx_cmd_build_rate(priv, tx_cmd, info, sta, fc);
+        /* If packet is to the monitor address, use the monitor rate; or
+         * if packet is to the broadcast address, use the broadcast rate
+         */
+        if ((IWLAGN_MONITOR_ID == sta_id) &&
+                        (priv->monitor_tx_rate != 0)) {
+                tx_cmd->tx_flags &= ~TX_CMD_FLG_STA_RATE_MSK;
+                tx_cmd->rate_n_flags = cpu_to_le32(priv->monitor_tx_rate);
+        } else if ((ctx->bcast_sta_id == sta_id) &&
+                        (priv->bcast_tx_rate != 0)) {
+                tx_cmd->tx_flags &= ~TX_CMD_FLG_STA_RATE_MSK;
+                tx_cmd->rate_n_flags = cpu_to_le32(priv->bcast_tx_rate);
+        } else
+                iwlagn_tx_cmd_build_rate(priv, tx_cmd, info, sta, fc);
 
 	memset(&info->status, 0, sizeof(info->status));
 	memset(info->driver_data, 0, sizeof(info->driver_data));

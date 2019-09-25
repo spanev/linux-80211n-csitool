@@ -526,6 +526,33 @@ static int iwlagn_rxon_connect(struct iwl_priv *priv,
 	return 0;
 }
 
+int iwlagn_send_dsp_debug(struct iwl_priv *priv)
+{
+        u32 count = 1;
+        size_t len = sizeof(struct iwl5000_dsp_debug) +
+                ((count + 1) & ~1) * sizeof(u16);
+        struct iwl5000_dsp_debug *dsp_debug = kmalloc(len, GFP_ATOMIC);
+        u16 *mib_indices;
+        int ret;
+
+        if (!dsp_debug)
+                return -ENOMEM;
+
+        mib_indices = (u16 *) dsp_debug->mib_indices;
+
+        dsp_debug->mib_cnt = count;
+        dsp_debug->flags = DSP_DEBUG_OFDM_MSK;
+        dsp_debug->stat_id = 0;
+        dsp_debug->reserved = 0;
+        mib_indices[0] = OFDM_RX_ANT_OUT;
+
+        ret = iwl_dvm_send_cmd_pdu(priv, DSP_DEBUG_CMD, CMD_ASYNC, len,
+                        dsp_debug);
+        kfree(dsp_debug);
+
+        return ret;
+}
+
 int iwlagn_set_pan_params(struct iwl_priv *priv)
 {
 	struct iwl_wipan_params_cmd cmd;
@@ -1058,6 +1085,12 @@ int iwlagn_commit_rxon(struct iwl_priv *priv, struct iwl_rxon_context *ctx)
 	if (!ctx->is_active)
 		return 0;
 
+        /* Enable beamforming */
+        if (priv->bf_enabled)
+                ctx->staging.flags |= RXON_FLG_BF_ENABLE_MSK;
+        else
+                ctx->staging.flags &= ~RXON_FLG_BF_ENABLE_MSK;
+
 	/* always get timestamp with Rx frame */
 	ctx->staging.flags |= RXON_FLG_TSF2HOST_MSK;
 
@@ -1140,6 +1173,11 @@ int iwlagn_commit_rxon(struct iwl_priv *priv, struct iwl_rxon_context *ctx)
 	ret = iwlagn_rxon_disconn(priv, ctx);
 	if (ret)
 		return ret;
+
+        /* DSP debug command makes sure we get antenna selection information */
+        ret = iwlagn_send_dsp_debug(priv);
+        if (ret)
+                return ret;
 
 	ret = iwlagn_set_pan_params(priv);
 	if (ret)

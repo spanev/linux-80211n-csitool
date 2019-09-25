@@ -33,6 +33,7 @@
 #include "agn.h"
 
 const u8 iwl_bcast_addr[ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+const u8 iwl_monitor_addr[ETH_ALEN] = { 0x00, 0x16, 0xEA, 0x12, 0x34, 0x56 }; 
 
 static int iwl_sta_ucode_activate(struct iwl_priv *priv, u8 sta_id)
 {
@@ -265,6 +266,8 @@ u8 iwl_prep_station(struct iwl_priv *priv, struct iwl_rxon_context *ctx,
 		sta_id = ctx->ap_sta_id;
 	else if (is_broadcast_ether_addr(addr))
 		sta_id = ctx->bcast_sta_id;
+	else if (is_monitor_ether_addr(addr))
+		sta_id = IWLAGN_MONITOR_ID;
 	else
 		for (i = IWL_STA_ID; i < IWLAGN_STATION_COUNT; i++) {
 			if (ether_addr_equal(priv->stations[i].sta.sta.addr,
@@ -1309,6 +1312,31 @@ int iwlagn_alloc_bcast_station(struct iwl_priv *priv,
 	spin_lock_bh(&priv->sta_lock);
 	priv->stations[sta_id].lq = link_cmd;
 	spin_unlock_bh(&priv->sta_lock);
+	
+        /* Above: broadcast. Below: monitor */
+        spin_lock_bh(&priv->sta_lock);
+        sta_id = iwl_prep_station(priv, ctx, iwl_monitor_addr, false, NULL);
+        if (sta_id == IWL_INVALID_STATION) {
+                IWL_ERR(priv, "Unable to prepare monitor station\n");
+                spin_unlock_bh(&priv->sta_lock);
+
+                return -EINVAL;
+        }
+
+        priv->stations[sta_id].used |= IWL_STA_DRIVER_ACTIVE;
+        priv->stations[sta_id].used |= IWL_STA_BCAST;
+        spin_unlock_bh(&priv->sta_lock);
+
+        link_cmd = iwl_sta_alloc_lq(priv, ctx, sta_id);
+        if (!link_cmd) {
+                IWL_ERR(priv,
+                        "Unable to initialize rate scaling for monitor station.\n");
+                return -ENOMEM;
+        }
+
+        spin_lock_bh(&priv->sta_lock);
+        priv->stations[sta_id].lq = link_cmd;
+        spin_unlock_bh(&priv->sta_lock);
 
 	return 0;
 }
@@ -1338,6 +1366,23 @@ int iwl_update_bcast_station(struct iwl_priv *priv,
 		IWL_DEBUG_INFO(priv, "Bcast station rate scaling has not been initialized yet.\n");
 	priv->stations[sta_id].lq = link_cmd;
 	spin_unlock_bh(&priv->sta_lock);
+
+        /* Above: broadcast. Below: monitor */
+        sta_id = IWLAGN_MONITOR_ID;
+
+        link_cmd = iwl_sta_alloc_lq(priv, ctx, sta_id);
+        if (!link_cmd) {
+                IWL_ERR(priv, "Unable to initialize rate scaling for monitor station.\n");
+                return -ENOMEM;
+        }
+
+        spin_lock_bh(&priv->sta_lock);
+        if (priv->stations[sta_id].lq)
+                kfree(priv->stations[sta_id].lq);
+        else
+                IWL_DEBUG_INFO(priv, "Monitor station rate scaling has not been initialized yet.\n");
+        priv->stations[sta_id].lq = link_cmd;
+        spin_unlock_bh(&priv->sta_lock);
 
 	return 0;
 }
