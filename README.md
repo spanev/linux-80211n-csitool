@@ -27,7 +27,16 @@ $ sudo apt update
 $ sudo apt install gcc-8 g++-8
 ```
 
-If you install different version of the compilers, you need to modify the Makefile.
+You need to ensure that the <code>make</code> command uses the right version of the compilers. You can use either of these two ways do it
+
+##### Modify the Makefile
+TODO
+
+##### Redirect the system links to the compilers executables
+TODO
+
+
+If you multiple versions of the compilers  installed on your system, you need to modify the Makefile.
 
 Additional packages which are required, but you may not have
 
