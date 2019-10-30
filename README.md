@@ -77,12 +77,21 @@ $ make -j `nproc` -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireles
 ```
 
 ```shell
-$ sudo make -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/intel/iwlwifi INSTALL_MOD_DIR=updates \
-    modules_install
+$ sudo make -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/intel/iwlwifi \
+$ INSTALL_MOD_DIR=updates modules_install
+```
+>**Remark:** If during the execution of the command above you get error messages similar to 
+>```shell
+>- SSL error:02001002:system library:fopen:No such file or directory: bss_file.c:175
+>- SSL error:2006D080:BIO routines:BIO_new_file:no such file: bss_file.c:178
+>sign-file: certs/signing_key.pem: No such file or directory
+>```
+>do not worry. The operating system complains that the driver doesn't have a SSL signature. That won't interfere with the driver >installation. Therefore, simply ignore that messages.
+
+```shell
 $ sudo depmod
 $ cd ..
 ```
-**Tip:** If the message <code>"Can't read private key"</code> appears, then the module could not be signed. This will not cause a problem unless the kernel enforces module signature verification.
 
 ### Install the Modified Firmware
 
