@@ -86,7 +86,7 @@ $ sudo make -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/inte
 >- SSL error:2006D080:BIO routines:BIO_new_file:no such file: bss_file.c:178
 >sign-file: certs/signing_key.pem: No such file or directory
 >```
->do not worry. The operating system complains that the driver doesn't have a SSL signature. That won't interfere with the driver >installation. Therefore, simply ignore that messages.
+>do not worry. The operating system complains, because the driver doesn't have a SSL signature. That won't interfere with the driver >installation. Therefore, simply ignore that messages.
 
 ```shell
 $ sudo depmod
