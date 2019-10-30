@@ -78,7 +78,7 @@ $ make -j `nproc` -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireles
 
 ```shell
 $ sudo make -C /lib/modules/$(uname -r)/build M=$(pwd)/drivers/net/wireless/intel/iwlwifi \
-$ INSTALL_MOD_DIR=updates modules_install
+> INSTALL_MOD_DIR=updates modules_install
 ```
 >**Remark:** If during the execution of the command above you get error messages similar to 
 >```shell
